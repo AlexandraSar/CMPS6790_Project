@@ -1,0 +1,51 @@
+State,City,ADL Minimum Firm Size,ADL Larger Damages than ADEA,DDL Minimum Firm Size,DDL Larger Damages than ADA,DDL Broader Definition of Disability
+Alabama,Birmingham,2,0,0,0,0
+Alaska,Anchorage,1,1,1,1,0
+Arizona,Phoenix,2,0,2,0,0
+Arkansas,Little Rock,0,0,1,0,0
+California,Los Angeles,1,1,1,1,1
+Colorado,Denver,1,0,1,0,0
+Connecticut,Hartford,1,0,1,0,1
+Delaware,Wilmingron,1,1,1,0,0
+Florida,Miami,2,1,2,0,0
+Georgia,Atlanta,1,0,2,0,0
+Hawaii,Honolulu,1,1,1,1,0
+Idaho,Boise,1,1,1,0,0
+Illinois,Chicago,1,1,1,0,1
+Indiana,Indianapolis,1,0,2,0,0
+Iowa,Des Moines,1,1,1,0,0
+Kansas,Wichita,1,1,1,0,0
+Kentucky,Louisville,1,1,2,0,0
+Louisiana,New Orleans,2,1,2,0,0
+Maine,Portland,1,1,1,1,0
+Maryland,Baltimore,1,1,1,0,0
+Massachusetts,Boston,1,1,1,1,0
+Michigan,Detroit,1,1,1,0,0
+Minnesota,Minneapolis,1,1,1,0,1
+Mississippi,Jackson,0,1,0,0,0
+Missouri,Kansas City,1,1,1,1,0
+Montana,Billings,1,0,1,0,0
+Nebraska,Lincoln,2,0,1,0,0
+Nevada,Las Vegas,2,1,1,0,0
+New Hampshire,Manchester,1,1,1,0,0
+New Jersey,Trenton,1,1,1,1,1
+New Mexico,Albuquerque,1,1,1,0,0
+New York,New York,1,1,1,0,1
+North Carolina,Charlotte,2,0,1,0,0
+North Dakota,Bismarck,1,0,1,0,0
+Ohio,Columbus,1,1,1,1,0
+Oklahoma,Oklahoma City,1,0,1,0,0
+Oregon,Portland,1,1,1,1,0
+Pennsylvania,Pittsburgh,1,0,1,0,0
+Rhode Island,Providence,1,1,1,1,0
+South Carolina,Columbia,2,0,2,0,0
+South Dakota,Sioux Falls,0,0,1,0,0
+Tennessee,Memphis,1,1,1,0,0
+Texas,Houston,1,1,2,0,0
+Utah,Salt Lake City,2,0,2,0,0
+Vermont,Burlingron,1,1,1,1,0
+Virginia,Virginia Beach,1,0,1,0,0
+Washington,Seattle,1,1,1,0,1
+West Virginia,Charleston,2,0,2,1,0
+Wisconsin,Milwaukee,1,0,1,0,0
+Wyoming,Cheyenne,2,0,2,0,0
