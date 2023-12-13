@@ -7,17 +7,79 @@ from geopy.geocoders import Nominatim
 import os
 import seaborn as sns
 
+from sklearn.utils._testing import ignore_warnings
+
+from sklearn.metrics import confusion_matrix
+from sklearn.utils import resample
+
+from sklearn.model_selection import StratifiedShuffleSplit
+
 from sklearn import preprocessing, svm, metrics
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.linear_model import LogisticRegression, Lasso
 from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import confusion_matrix
 from sklearn.utils import resample
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+from sklearn.utils._testing import ignore_warnings
+from sklearn.exceptions import ConvergenceWarning
+
+pd.options.mode.chained_assignment = None  # default='warn'
+
 #NOTE IMPORTANT
 #37114  and 37124 are INVALID LINES IN THE RAW DATA, THEY NEED TO BE MANUALLY DELETED
 
 script_directory = os.getcwd()
+
+def statistics(clf, X_test, y_test, y_pred,text, analytics_dict, y_test_full):
+    old_test = y_test_full.loc[(y_test_full.agegroup == 3.0)]
+    young_test = y_test_full.loc[((y_test_full.agegroup == 1.0) | (y_test_full.agegroup == 2.0))]
+
+    #Since we need to test the old and the combined group together, we need to recover the indices from the full dataframe (y_test_full)!
+    
+    #So we take the intersection of indices from the X_test, since it is a dataframe,  and the full dataframe to identify test data that is for the desired agegroup.
+    #then we take those indices and intersect them with the target cariable for the prediction and test y values.
+    intersec_young = np.nonzero(np.in1d(X_test.index, young_test.index))
+    intersec_old = np.nonzero(np.in1d(X_test.index, old_test.index))
+    analytics_dict = {}
+    TN_y, FP_y, FN_y, TP_y = confusion_matrix(y_test[intersec_young], y_pred[intersec_young]).ravel()
+    TN_o, FP_o, FN_o, TP_o = confusion_matrix(y_test[intersec_old], y_pred[intersec_old]).ravel()
+
+    TN, FP, FN, TP = confusion_matrix(y_test, y_pred).ravel()
+    print(f'\nStatistics for {text}:')
+
+    print('True Positive(TP)  = ', TP)
+    print('False Positive(FP) = ', FP)
+    print('True Negative(TN)  = ', TN)
+    print('False Negative(FN) = ', FN)
+
+    accuracy =  (TP + TN) / (TP + FP + TN + FN) 
+    fpr, tpr, thresholds = metrics.roc_curve(y_test, y_pred)
+    roc_auc = metrics.auc(fpr, tpr)
+    #display = metrics.RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=roc_auc,
+    #                               estimator_name=text)
+    display = metrics.RocCurveDisplay.from_estimator( clf, X_test, y_test)
+    accuracy_5 = cross_val_score(clf, X_test, y_test.ravel(), scoring='accuracy', cv = 5)
+
+    print('Cross Validate 5-fold : ')
+    print(accuracy_5)
+    
+    accuracy_10 = cross_val_score(clf, X_test, y_test.ravel(), scoring='accuracy', cv = 10)
+
+    print('Cross Validate 5-fold : ')
+    print(accuracy_10)
+    #display.plot()
+    plt.show()
+    print('Accuracy of the binary classifier = {:0.3f}'.format(accuracy))
+    analytics_dict = {'accuracy' : accuracy, 'cross_val_5' : accuracy_5, 'cross_val_10' : accuracy_10, 'dp_parity': ((TP_y + FP_y) / (TP_y + FP_y + FN_y + TN_y)) -((TP_o + FP_o) / (TP_o + FP_y + FN_o + TN_o)),
+                       'dp_parity_gap': ((TP_y + TN_y) / (TP_y + FP_y + FN_y + TN_y)) -((TP_o + TN_o) / (TP_o + FP_y + FN_o + TN_o)), 'prevalence': (TP+FP)/(TP+FP+TN+FN),
+                      'PPR': (TP_y/ (TP_y+FP_y)) - (TP_o/ (TP_o+FP_o)), 'recall' : TP/ (TP+FN), 'TP' : TP,
+                      'FP_dif' : (( FP_y) / (TP_y + FP_y + FN_y + TN_y)) -((FP_o) / (TP_o + FP_y + FN_o + TN_o)), 'TP_dif' : (( TP_y) / (TP_y + FP_y + FN_y + TN_y)) -((FP_o) / (TP_o + FP_y + FN_o + TN_o)),
+                            'FP': FP, 'TN' : TN, 'FN' : FN, 'FPR' : fpr, 'TPR' : tpr, 'thresholds' : thresholds, 'TP_rate' :  (TP)/(TP+FP+TN+FN),'FP_rate' :  (FP)/(TP+FP+TN+FN), 'AUC' : roc_auc}
+    return analytics_dict
+
 def get_states(lon, lat):
     ''' Input two 1D lists of floats/ints '''
     geolocator = Nominatim(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36")
@@ -38,9 +100,24 @@ def get_unemployment_state(state, years):
 
 #data = set_state() #Calls to parse and clean the mergefinal and adds the state using geopy
 #data
-def statistics(clf, X_test, y_test, y_pred,text):
+
+def statistics(clf, X_test, y_test, y_pred,text, analytics_dict, y_test_full):
+    old_test = y_test_full.loc[(y_test_full.agegroup == 3.0)]
+    young_test = y_test_full.loc[((y_test_full.agegroup == 1.0) | (y_test_full.agegroup == 2.0))]
+
+    #Since we need to test the old and the combined group together, we need to recover the indices from the full dataframe (y_test_full)!
+    
+    #So we take the intersection of indices from the X_test, since it is a dataframe,  and the full dataframe to identify test data that is for the desired agegroup.
+    #then we take those indices and intersect them with the target cariable for the prediction and test y values.
+    intersec_young = np.nonzero(np.in1d(X_test.index, young_test.index))
+    intersec_old = np.nonzero(np.in1d(X_test.index, old_test.index))
+    analytics_dict = {}
+    TN_y, FP_y, FN_y, TP_y = confusion_matrix(y_test[intersec_young], y_pred[intersec_young]).ravel()
+    TN_o, FP_o, FN_o, TP_o = confusion_matrix(y_test[intersec_old], y_pred[intersec_old]).ravel()
+
     TN, FP, FN, TP = confusion_matrix(y_test, y_pred).ravel()
     print(f'\nStatistics for {text}:')
+
     print('True Positive(TP)  = ', TP)
     print('False Positive(FP) = ', FP)
     print('True Negative(TN)  = ', TN)
@@ -51,31 +128,56 @@ def statistics(clf, X_test, y_test, y_pred,text):
     roc_auc = metrics.auc(fpr, tpr)
     #display = metrics.RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=roc_auc,
     #                               estimator_name=text)
-    displayy = metrics.RocCurveDisplay.from_estimator( clf, X_test, y_test)
+    display = metrics.RocCurveDisplay.from_estimator( clf, X_test, y_test)
+    accuracy_5 = cross_val_score(clf, X_test, y_test.ravel(), scoring='accuracy', cv = 5)
 
+    print('Cross Validate 5-fold : ')
+    print(accuracy_5)
+    
+    accuracy_10 = cross_val_score(clf, X_test, y_test.ravel(), scoring='accuracy', cv = 10)
+
+    print('Cross Validate 5-fold : ')
+    print(accuracy_10)
     #display.plot()
     plt.show()
     print('Accuracy of the binary classifier = {:0.3f}'.format(accuracy))
+    analytics_dict = {'accuracy' : accuracy, 'cross_val_5' : accuracy_5, 'cross_val_10' : accuracy_10, 'dp_parity': ((TP_y + FP_y) / (TP_y + FP_y + FN_y + TN_y)) -((TP_o + FP_o) / (TP_o + FP_y + FN_o + TN_o)),
+                       'dp_parity_gap': ((TP_y + TN_y) / (TP_y + FP_y + FN_y + TN_y)) -((TP_o + TN_o) / (TP_o + FP_y + FN_o + TN_o)), 'prevalence': (TP+FP)/(TP+FP+TN+FN),
+                      'PPR': (TP_y/ (TP_y+FP_y)) - (TP_o/ (TP_o+FP_o)), 'recall' : TP/ (TP+FN), 'TP' : TP,
+                      'FP_dif' : (( FP_y) / (TP_y + FP_y + FN_y + TN_y)) -((FP_o) / (TP_o + FP_y + FN_o + TN_o)), 'TP_dif' : (( TP_y) / (TP_y + FP_y + FN_y + TN_y)) -((FP_o) / (TP_o + FP_y + FN_o + TN_o)),
+                            'FP': FP, 'TN' : TN, 'FN' : FN, 'FPR' : fpr, 'TPR' : tpr, 'thresholds' : thresholds, 'TP_rate' :  (TP)/(TP+FP+TN+FN),'FP_rate' :  (FP)/(TP+FP+TN+FN), 'AUC' : roc_auc}
+    return analytics_dict
+    
 
-def run_ML(df_majority, df_minority):
+@ignore_warnings(category=ConvergenceWarning)
+def run_ML(df, remove_age = False, perc = 0.3, eq_base_rate = False, hi_base_rate = False, balanced_outcomes = False):
+    """
+    Args:
+    
+    remove_age: boolean or integer, default boolean False. Which age group do we remove
+        1 - young
+        2- middle
+        3- old
+    perc: perentage of rate to reove
+    Returns:
+    """
+    analytics_dict = {}
     label_encoder = preprocessing.LabelEncoder()
     hot_encoder = preprocessing.OneHotEncoder()
-
-
-    df_majority_downsampled = resample(df_majority, 
+    
+    #Change to baserate difference, change to percentage of group
+    #read under and oversample regime
+    """df_majority_downsampled = resample(df_majority, 
                                      replace=True,     
                                      n_samples=len(df_minority),    
-                                     random_state=42) 
+                                     random_state=42) """
 
 
-    df_resampled = pd.concat([df_minority, df_majority_downsampled])
+    #df_resampled = pd.concat([df_minority, df_majority_downsampled])
+    df_resampled = df
+    X = df_resampled
+
     
-    y = np.array(df_resampled['callback']).reshape(-1, 1).astype('int')
-    
-
-    X = df_resampled.drop(columns=['callback', 'adtitle'])
-    X.employment = X['employment'].replace({'Unemployed': 0, 'Employed': 1})
-    X.skill = X['skill'].replace({'High': 1, 'Low': 0})    
     transformed = pd.get_dummies(X.occupation)
     X = pd.concat([X, transformed], axis=1).drop(['occupation'], axis=1)    
     
@@ -87,25 +189,101 @@ def run_ML(df_majority, df_minority):
     
     transformed = pd.get_dummies(X.template)
     X = pd.concat([X, transformed], axis=1).drop(['template'], axis=1)
+    X.employment = X['employment'].replace({'Unemployed': 0, 'Employed': 1})
+    X.skill = X['skill'].replace({'High': 1, 'Low': 0})
+    
+    
+    X.dropna(inplace = True)
+    
+    #y = np.array(X['callback']).reshape(-1, 1).astype('int')
+    y = X['callback']
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.25)
+    sss = StratifiedShuffleSplit(n_splits=1, test_size=0.2, random_state=0)
+    sss.get_n_splits(X, y)
+    
+    for train_index, test_index in sss.split(X, y):
+        X_train, X_test = X.iloc[train_index], X.iloc[test_index]
+        y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+        
+    y_train = np.array(y_train).reshape(-1, 1).astype('int')
+    y_test = np.array(y_test).reshape(-1, 1).astype('int')
 
+    #X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.20)
+    
+    #Fewer Young/Middle: Randomly select young or middle people and delete them from the 80% -- remove different percentages, e.g., 10%/30%/70%/100% 
+    if remove_age is not False:
+        dropIndices1 = np.random.choice(X_train.loc[(X_train.agegroup == remove_age[0]) | (X_train.agegroup == remove_age[1])].index.tolist(), size = int(X_train.shape[0]*perc))
+        X_train.drop(dropIndices1)
+        
+    #Equalize Base Rate: Randomly delete old people that did not get a callback so that the callback rate of young/middle == callback rate of old in the 80% of the data 
+    if eq_base_rate is True:
+        #quickhack
+        callbacks_young = len(X_train.loc[((X_train['agegroup'] == 2.0) | (X_train['agegroup'] == 1.0)) & (X_train['callback'] == 1.0)])
+        base_rate_young = callbacks_young / len(X_train.loc[((X_train['agegroup'] == 2.0) | (X_train['agegroup'] == 1.0))])
 
-    regr = LogisticRegression(max_iter=500)
+        callbacks_old = len(X_train.loc[((X_train['agegroup'] == 3.0)) & (X_train['callback'] == 1.0)])
+        base_rate_old = callbacks_old / len(X_train.loc[(X_train['agegroup'] == 3.0)])
+
+        dropIndices1 = np.random.choice(X_train.loc[(X_train['agegroup'] == 3.0) & (X_train['callback'] == 0.0)].index.tolist(), size = int(abs(base_rate_young -base_rate_old * 100)))
+        X_train.drop(dropIndices1)
+    
+    #Higher Base Rate Difference: Randomly delete young/middle people that did not get a call back in 80% of the data – again at different percentages 10%/30%/70%/100% 
+    if hi_base_rate is True:
+        dropIndices1 = np.random.choice(X_train.loc[((X_train['agegroup'] == 1.00) | (X_train['agegroup'] == 2.00)) & (X_train['callback'] == 1.0)].index.tolist(), size = int(X_train.shape[0]*perc))
+        X_train.drop(dropIndices1)
+    
+    if balanced_outcomes is True:
+        #Balanced Outcomes: Find the group with the lowest total call backs and then down sample all groups so that the number of callbacks and the number of non-callbacks is the same
+        callbacks_old = len(X_train.loc[((X_train['agegroup'] == 3.0)) & (X_train['callback'] == 1.0)])
+        callbacks_middle = len(X_train.loc[((X_train['agegroup'] == 2.0)) & (X_train['callback'] == 1.0)])
+        callbacks_young = len(X_train.loc[((X_train['agegroup'] == 1.0)) & (X_train['callback'] == 1.0)])
+        
+        base_rate_young = callbacks_young / len(X_train.loc[(X_train['agegroup'] == 1.0)])
+        base_rate_middle = callbacks_middle / len(X_train.loc[(X_train['agegroup'] == 2.0)])
+
+        no_callbacks_min = len(X_train.loc[((X_train['agegroup'] == 3.0)) & (X_train['callback'] == 0.0)])  
+        base_rate_old = callbacks_old / len(X_train.loc[(X_train['agegroup'] == 3.0)])
+
+        #drop extra for middle group
+        dropIndices1 = np.random.choice(X_train.loc[(X_train['agegroup'] == 2.0) & (X_train['callback'] == 0.0)].index.tolist(), size = int(abs(base_rate_middle -base_rate_old * 100)))
+        X_train.drop(dropIndices1)
+        dropIndices1 = np.random.choice(X_train.loc[(X_train['agegroup'] == 2.0) & (X_train['callback'] == 1.0)].index.tolist(), size = int(abs(base_rate_middle -base_rate_old * 100)))
+        X_train.drop(dropIndices1)
+        
+        #drop extra for young group
+        dropIndices1 = np.random.choice(X_train.loc[(X_train['agegroup'] == 1.0) & (X_train['callback'] == 0.0)].index.tolist(), size = int(abs(base_rate_young -base_rate_old * 100)))
+        X_train.drop(dropIndices1)
+        dropIndices1 = np.random.choice(X_train.loc[(X_train['agegroup'] == 1.0) & (X_train['callback'] == 1.0)].index.tolist(), size = int(abs(base_rate_young -base_rate_old * 100)))
+        X_train.drop(dropIndices1)
+
+    X_train = X_train.drop(columns=['callback', 'adtitle'])    
+    X_test = X_test.drop(columns=['callback', 'adtitle'])   
+    
+    orig_X = X_test.copy()
+
+    X_train.drop(['agegroup'], axis=1)
+    X_test.drop(['agegroup'], axis=1)
+    
+    regr = LogisticRegression(max_iter=300)
     clf_LR = regr.fit(X_train, y_train.ravel())
     y_pred_regr = regr.predict(X_test)
-        
-    statistics(clf_LR, X_test, y_test, y_pred_regr, 'Logistic Regression')
-    
+    coeffs_LR = clf_LR.coef_
+    analytics_dict['LR '] = statistics(clf_LR, X_test, y_test, y_pred_regr, 'Logistic Regression', analytics_dict,orig_X)
+    #print("Coefficients for Logistic Regression:")
+    #print(coeffs_LR)
+
     rf = RandomForestClassifier()
     clf_RF = rf.fit(X_train, y_train.ravel())
     y_pred_rf = rf.predict(X_test)
-    statistics(clf_RF, X_test, y_test, y_pred_rf, 'Random Forest')
+    analytics_dict['RFR'] = statistics(clf_RF, X_test, y_test, y_pred_rf, 'Random Forest', analytics_dict, orig_X)
     
     MLP = MLPClassifier(hidden_layer_sizes=(150,100,50), max_iter=300,activation = 'relu',solver='adam',random_state=1)
     clf_MLP = MLP.fit(X_train, y_train.ravel())
     y_pred_MLP = MLP.predict(X_test)
-    statistics(clf_MLP, X_test, y_test, y_pred_MLP, 'MLP')
+    analytics_dict['MLP'] = statistics(clf_MLP, X_test, y_test, y_pred_MLP, 'MLP', analytics_dict, orig_X)
+    
+    return analytics_dict
+
     
 def plot_confusion_matrix(data, labels):
     seaborn.set(color_codes=True)
@@ -174,10 +352,80 @@ def get_education(state, year):
     some_college = pd.read_csv(script_directory + "\Data\\CLEANED_EducationReport_some_college.csv")
     
     
-    return [bach.loc[bach['county2'] == state][year].values,
-    high_school.loc[high_school['county2'] == state][year].values,
-    some_college.loc[some_college['county2'] == state][year].values]
+    return [bach.loc[bach['county2'] == state][year].values,    high_school.loc[high_school['county2'] == state][year].values]
+            
+            
+def analytics(analytics_dict):
+    """demographic parity ; receiving positive outcomes at the same rate,
+    the demographic parity gap; difference in the two groups parities, 
+    the accuracy parity ; the division of accurate outcomes between the two groups, 
+    equalized odds ; that equal true positive and false positive rates between the two different groups match,
+    predictive rate parity; whether a classifiers precision rates are equivalent for subgroups under consideration.
+    """
+    keys_t = ''
+    keys = ''                                                                                                                   
+    dp_str = ''
+    for key_t in analytics_dict.keys():
+        keys_t += '\t' + key_t
+        model_dict = analytics_dict[key_t]
+        ti_k = '\t '
 
+        for key in model_dict.keys():
+            ti_k += f'{key_t} {key} {key_t} \t'
+            dp_str +=  f' {key_t} {key}: {np.round(model_dict[key]["dp_parity"], 3)},\t'
+        dp_str+= '\n'
+    print('Demographic parities')
+    print('Receiving positive outcomes at the same rate (difference in the two groups parities) -- Equal Positive Prediction Rates ')
+    print(keys)
+    print(dp_str)
+        
+    
+    dp_str_gp = ''
+    for key_t in analytics_dict.keys():       
+        model_dict = analytics_dict[key_t]
+
+        for key in model_dict.keys():
+            ti_k += f'{key_t} {key} {key_t} \t'
+            dp_str_gp +=  f'{key_t} {key}: {np.round(model_dict[key]["dp_parity_gap"], 3)}: \t'
+        dp_str_gp += '\n'
+    print('\nDemographic parities gap for', key_t)
+    print('The division of accurate outcomes between the two groups')
+    print('\t', keys)
+    print(dp_str_gp)
+
+    dp_str_TP = ''
+    dp_str_FP = ''
+    for key_t in analytics_dict.keys():
+        for key in model_dict.keys():
+            dp_str_TP += f'TP {key_t} {key}: {np.round(model_dict[key]["TP_dif"], 3)} , '
+            dp_str_FP += f'FP {key_t} {key}: {np.round(model_dict[key]["FP_dif"], 3)} , '
+        dp_str_TP += '\n'
+        dp_str_FP += '\n'
+    print('\nEqualised Odds')
+    print('Equal true positive and false positive rates between the two different groups match')
+    print('\t', keys)
+    print(dp_str_TP, '\n', dp_str_FP)
+    
+    dp_str_precision = ''
+    for key_t in analytics_dict.keys():
+        model_dict = analytics_dict[key_t]
+
+        for key in model_dict.keys():
+            dp_str_precision += f'{key} {key_t}: {np.round(model_dict[key]["PPR"], 3)}'
+    print('\nPredictive Rate Parity')
+    print('Whether a classifiers precision rates are equivalent for subgroups under consideration. ')
+    print('\t', keys)
+    print(dp_str_precision)
+        
+    print('\nROC AUC')
+    roc_auc = ''
+    for key_t in analytics_dict.keys():
+        prev = analytics_dict[key_t]
+        for key1 in prev.keys():
+            roc_auc += f'{key_t}, {key1}: {np.round(prev[key1]["AUC"], 3)}\t'
+        roc_auc += '\n'
+    print(roc_auc)
+            
 def gen_unemployment_csv():
     resume_data = pd.read_csv(script_directory + '\\Data\\unemployment_with_state.csv')
 
